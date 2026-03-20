@@ -1,15 +1,15 @@
 # Parquet2CSV
 
-This project contains a Python script that recursively searches the `input` directory for `.parquet` files and writes them as `.csv` files to the `output` directory.
+This repository contains a Python script that recursively searches the `input` directory for `.parquet` files and writes them as `.csv` files to the `output` directory.
 
-## How It Works
+## What It Does
 
 - searches `input` including all subdirectories for `.parquet` files
-- creates `output` automatically if the directory does not exist yet
+- creates `output` automatically if it does not exist yet
 - converts every matching file into a CSV file
 - preserves the directory structure from `input` inside `output`
-- allows the CSV delimiter and decimal separator to be defined via command-line parameters
-- shows a live console progress display with the current file name, file progress, and total progress
+- supports custom CSV delimiters and decimal separators
+- shows progress in the console while files are being converted
 
 Example:
 
@@ -54,17 +54,22 @@ Install the dependencies inside the virtual environment:
 pip install -r requirements.txt
 ```
 
+## Project Structure
+
+```text
+Parquet2CSV/
+|-- input/
+|-- output/
+|-- convert_parquet_to_csv.py
+|-- requirements.txt
+|-- README.md
+```
+
+Place the `.parquet` files you want to convert into `input`.
+
 ## Usage
 
-Recommended order when working with `venv`:
-
-1. Create the virtual environment once with `python -m venv .venv`.
-2. Activate the virtual environment.
-3. Install the dependencies with `pip install -r requirements.txt`.
-4. Run the script.
-5. Deactivate the virtual environment after you are finished working.
-
-On macOS, the `venv` workflow is usually the same as on Linux.
+After the virtual environment is activated and the dependencies are installed, run the script with:
 
 ```powershell
 python convert_parquet_to_csv.py
@@ -82,7 +87,7 @@ Example using a semicolon as the CSV delimiter and a comma as the decimal separa
 python convert_parquet_to_csv.py --delimiter ";" --decimal ","
 ```
 
-Deactivate the virtual environment when you are done:
+When you are finished, you can deactivate the virtual environment:
 
 ```powershell
 deactivate
@@ -93,28 +98,14 @@ deactivate
 - `--delimiter`: defines the delimiter used in the generated CSV files, default is `,`
 - `--decimal`: defines the decimal separator used for numeric values, default is `.`
 
-Notes:
+Rules:
 
 - both parameters must be exactly one character long
 - `--delimiter` and `--decimal` must not use the same value
 
-## Project Structure
-
-```text
-Parquet2CSV/
-|-- input/
-|-- output/
-|-- convert_parquet_to_csv.py
-|-- requirements.txt
-|-- README.md
-```
-
-## Notes
+## Behavior
 
 - If no `.parquet` files are found, the script prints a corresponding message.
 - If `input` does not exist, the script exits with an error message.
-- `pyarrow` is used to read the Parquet files.
-- `rich` is used for the live progress display in the console.
-- The progress output shows the current file, the progress inside that file, and the overall progress across all files.
-- The row progress is updated in smaller batches, so large files refresh more smoothly than with coarse row-group-only updates.
-- Help for all parameters is available through `-h` or `--help`.
+- Converted files are written to `output` with the same relative folder structure as in `input`.
+- The console shows the current file, the progress within that file, and the total progress across all files.
