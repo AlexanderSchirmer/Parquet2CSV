@@ -1,111 +1,73 @@
 # Parquet2CSV
 
-This repository contains a Python script that recursively searches the `input` directory for `.parquet` files and writes them as `.csv` files to the `output` directory.
+A simple script to convert `.parquet` files to `.csv` files. The script automatically reads all Parquet files from the `input` directory and saves the converted CSV files in the `output` directory.
 
-## What It Does
+## Prerequisites & Installation
 
-- searches `input` including all subdirectories for `.parquet` files
-- creates `output` automatically if it does not exist yet
-- converts every matching file into a CSV file
-- preserves the directory structure from `input` inside `output`
-- supports custom CSV delimiters and decimal separators
-- shows progress in the console while files are being converted
+You need **Python 3.10 or newer**. It is recommended to run the script in a virtual environment (`venv`) to avoid conflicts with other Python packages.
 
-Example:
-
-- `input\data\example.parquet` becomes `output\data\example.csv`
-
-## Requirements
-
-- Python 3.10 or newer
-- installed dependencies from `requirements.txt`
-
-## Installation
-
-Recommended: use a virtual environment with `venv`.
-
-Create a virtual environment:
+**1. Create a virtual environment:**
 
 ```powershell
 python -m venv .venv
 ```
 
-Activate it on Windows in PowerShell:
+**2. Activate the virtual environment:**
 
+On Windows in PowerShell:
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
+*(Alternative: `cmd`: `.venv\Scripts\activate.bat` | Linux/macOS: `source .venv/bin/activate`)*
 
-Activate it on Windows in Command Prompt:
-
-```cmd
-.venv\Scripts\activate.bat
-```
-
-Activate it on Linux or macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-Install the dependencies inside the virtual environment:
+**3. Install dependencies:**
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-## Project Structure
+## Folder Structure
+
+Make sure your files and directories are organized like this before running the script:
 
 ```text
-Parquet2CSV/
-|-- input/
-|-- output/
-|-- convert_parquet_to_csv.py
-|-- requirements.txt
-|-- README.md
+your_folder/
+|-- input/                      <-- Put your .parquet files here
+|-- convert_parquet_to_csv.py   <-- The script
+|-- requirements.txt            <-- Dependencies
 ```
-
-Place the `.parquet` files you want to convert into `input`.
+*(The `output/` folder will be created automatically when you run the script).*
 
 ## Usage
 
-After the virtual environment is activated and the dependencies are installed, run the script with:
+1. Copy all `.parquet` files you want to convert into the `input/` folder. (Subfolders are allowed and will be preserved).
+2. Make sure your virtual environment is activated.
+3. Start the conversion:
 
 ```powershell
 python convert_parquet_to_csv.py
 ```
 
-Show parameter help:
+The converted `.csv` files will automatically be saved in the `output/` folder.
+When you are finished, you can leave the virtual environment by running the `deactivate` command.
 
-```powershell
-python convert_parquet_to_csv.py --help
-```
+### Advanced Settings (Parameters)
 
-Example using a semicolon as the CSV delimiter and a comma as the decimal separator:
+You can customize the format of the exported CSV file, which is especially useful for some spreadsheet software (like German Excel):
 
+- `--delimiter`: Sets the delimiter (default is a comma `,`)
+- `--decimal`: Sets the decimal separator (default is a period `.`)
+
+**Example for German CSV format (delimiter `;` and comma as decimal separator):**
 ```powershell
 python convert_parquet_to_csv.py --delimiter ";" --decimal ","
 ```
 
-When you are finished, you can deactivate the virtual environment:
+You can view all available commands with `python convert_parquet_to_csv.py --help`.
 
-```powershell
-deactivate
-```
+## Rules & Behavior
 
-## Parameters
-
-- `--delimiter`: defines the delimiter used in the generated CSV files, default is `,`
-- `--decimal`: defines the decimal separator used for numeric values, default is `.`
-
-Rules:
-
-- both parameters must be exactly one character long
-- `--delimiter` and `--decimal` must not use the same value
-
-## Behavior
-
+- Both parameters (`--delimiter` and `--decimal`) must be exactly one character long and must not use the same value.
 - If no `.parquet` files are found, the script prints a corresponding message.
 - If `input` does not exist, the script exits with an error message.
-- Converted files are written to `output` with the same relative folder structure as in `input`.
 - The console shows the current file, the progress within that file, and the total progress across all files.
