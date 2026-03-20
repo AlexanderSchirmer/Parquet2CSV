@@ -13,6 +13,7 @@ INPUT_DIR = BASE_DIR / "input"
 OUTPUT_DIR = BASE_DIR / "output"
 DEFAULT_DELIMITER = ","
 DEFAULT_DECIMAL_SEPARATOR = "."
+DEFAULT_BATCH_SIZE = 5_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,15 +58,18 @@ def format_value(value: object, decimal_separator: str) -> str:
     return str(value)
 
 
-def write_csv(table: object, csv_path: Path, delimiter: str, decimal_separator: str) -> None:
-    with csv_path.open("w", newline="", encoding="utf-8") as output_file:
-        writer = csv.writer(output_file, delimiter=delimiter)
-        writer.writerow(table.column_names)
+def write_csv_rows(
+    writer: csv.writer,
+    batch: object,
+    decimal_separator: str,
+) -> None:
+    columns = batch.to_pydict()
+    column_names = list(batch.schema.names)
 
-        for row in table.to_pylist():
-            writer.writerow(
-                [format_value(row.get(column_name), decimal_separator) for column_name in table.column_names]
-            )
+    for row_index in range(batch.num_rows):
+        writer.writerow(
+            [format_value(columns[column_name][row_index], decimal_separator) for column_name in column_names]
+        )
 
 
 def load_parquet_module() -> object:
@@ -79,6 +83,82 @@ def load_parquet_module() -> object:
         raise SystemExit(1)
 
 
+def load_rich_progress_components() -> tuple[object, object, object, object, object, object, object, object, object]:
+    try:
+        rich_live = import_module("rich.live")
+        rich_progress = import_module("rich.progress")
+        rich_console = import_module("rich.console")
+    except ImportError:
+        print(
+            "Missing dependency: rich. Install it with 'pip install rich'.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    return (
+        rich_console.Console,
+        rich_console.Group,
+        rich_live.Live,
+        rich_progress.Progress,
+        rich_progress.SpinnerColumn,
+        rich_progress.TextColumn,
+        rich_progress.BarColumn,
+        rich_progress.TaskProgressColumn,
+        rich_progress.TimeElapsedColumn,
+    )
+
+
+def write_parquet_to_csv(
+    parquet_file: Path,
+    csv_path: Path,
+    pq: object,
+    delimiter: str,
+    decimal_separator: str,
+    status_progress: object,
+    status_task_id: int,
+    progress: object,
+    total_task_id: int,
+    file_task_id: int,
+    file_index: int,
+    file_total: int,
+    display_name: str,
+) -> None:
+    parquet_data = pq.ParquetFile(parquet_file)
+    metadata = parquet_data.metadata
+    total_rows = metadata.num_rows
+    processed_rows = 0
+
+    status_progress.update(
+        status_task_id,
+        description=f"Current file ({file_index}/{file_total}): {display_name}",
+    )
+    progress.update(
+        file_task_id,
+        description="File progress",
+        total=max(total_rows, 1),
+        completed=0,
+        visible=True,
+    )
+    progress.update(total_task_id, description="Total progress")
+
+    with csv_path.open("w", newline="", encoding="utf-8") as output_file:
+        writer = csv.writer(output_file, delimiter=delimiter)
+
+        if total_rows == 0:
+            empty_table = parquet_data.read()
+            writer.writerow(empty_table.column_names)
+            progress.update(file_task_id, completed=1)
+            return
+
+        for batch_index, batch in enumerate(parquet_data.iter_batches(batch_size=DEFAULT_BATCH_SIZE)):
+            if batch_index == 0:
+                writer.writerow(batch.schema.names)
+
+            write_csv_rows(writer, batch, decimal_separator)
+            processed_rows += batch.num_rows
+            progress.update(file_task_id, completed=min(processed_rows, total_rows))
+
+
 def convert_parquet_files(
     input_dir: Path,
     output_dir: Path,
@@ -86,6 +166,9 @@ def convert_parquet_files(
     decimal_separator: str,
 ) -> int:
     pq = load_parquet_module()
+    Console, Group, Live, Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn = (
+        load_rich_progress_components()
+    )
     parquet_files = sorted(input_dir.rglob("*.parquet"))
 
     if not parquet_files:
@@ -95,16 +178,54 @@ def convert_parquet_files(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     converted_count = 0
-    for parquet_file in parquet_files:
-        relative_path = parquet_file.relative_to(input_dir)
-        csv_path = output_dir / relative_path.with_suffix(".csv")
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
+    console = Console()
+    status_progress = Progress(
+        TextColumn("{task.description}"),
+        console=console,
+        transient=False,
+    )
+    progress = Progress(
+        TextColumn("{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    )
 
-        table = pq.read_table(parquet_file)
-        write_csv(table, csv_path, delimiter, decimal_separator)
+    group = Group(status_progress, progress)
 
-        converted_count += 1
-        print(f"Converted: '{parquet_file}' -> '{csv_path}'")
+    with Live(group, console=console, refresh_per_second=10):
+        status_task_id = status_progress.add_task("Current file:", total=None)
+        file_task_id = progress.add_task("File progress", total=1)
+        total_task_id = progress.add_task("Total progress", total=len(parquet_files))
+
+        for file_index, parquet_file in enumerate(parquet_files, start=1):
+            relative_path = parquet_file.relative_to(input_dir)
+            csv_path = output_dir / relative_path.with_suffix(".csv")
+            csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+            write_parquet_to_csv(
+                parquet_file,
+                csv_path,
+                pq,
+                delimiter,
+                decimal_separator,
+                status_progress,
+                status_task_id,
+                progress,
+                total_task_id,
+                file_task_id,
+                file_index,
+                len(parquet_files),
+                relative_path.as_posix(),
+            )
+
+            progress.advance(total_task_id, 1)
+            converted_count += 1
+
+        status_progress.update(status_task_id, description="Current file: completed")
+        progress.update(file_task_id, completed=1, total=1)
 
     return converted_count
 

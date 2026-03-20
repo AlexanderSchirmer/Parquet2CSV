@@ -9,6 +9,7 @@ This project contains a Python script that recursively searches the `input` dire
 - converts every matching file into a CSV file
 - preserves the directory structure from `input` inside `output`
 - allows the CSV delimiter and decimal separator to be defined via command-line parameters
+- shows a live console progress display with the current file name, file progress, and total progress
 
 Example:
 
@@ -113,4 +114,7 @@ Parquet2CSV/
 - If no `.parquet` files are found, the script prints a corresponding message.
 - If `input` does not exist, the script exits with an error message.
 - `pyarrow` is used to read the Parquet files.
+- `rich` is used for the live progress display in the console.
+- The progress output shows the current file, the progress inside that file, and the overall progress across all files.
+- The row progress is updated in smaller batches, so large files refresh more smoothly than with coarse row-group-only updates.
 - Help for all parameters is available through `-h` or `--help`.
